@@ -1,0 +1,63 @@
+cabal-version: 3.0
+name: circuits-rl
+version: 0.1.0.0
+license: BSD-3-Clause
+license-file: LICENSE
+copyright: Tony Day (c) 2026
+category: math
+author: Tony Day
+maintainer: tonyday567@gmail.com
+homepage: https://github.com/tonyday567/circuits-rl#readme
+bug-reports: https://github.com/tonyday567/circuits-rl/issues
+synopsis: Reinforcement learning as Prob composition over circuits
+description:
+  Reinforcement learning interpreted through the circuits substrate:
+  value functions as continuations, Bellman backup as composition in Prob,
+  and value iteration as a fold. Follows the frontier circuits-rl spike;
+  System (Prob arr r) s (Mono i o) packaging is the next slice.
+
+build-type: Simple
+tested-with:
+  ghc ==9.14.1
+
+extra-doc-files:
+  ChangeLog.md
+  readme.md
+
+source-repository head
+  type: git
+  location: https://github.com/tonyday567/circuits-rl
+
+common ghc-options-stanza
+  ghc-options:
+    -Wall
+    -Wno-unused-imports
+    -Wcompat
+    -Widentities
+    -Wincomplete-record-updates
+    -Wincomplete-uni-patterns
+    -Wpartial-fields
+    -Wredundant-constraints
+
+common ghc2024-stanza
+  default-language: GHC2024
+
+library
+  import: ghc-options-stanza
+  import: ghc2024-stanza
+  hs-source-dirs: src
+  exposed-modules:
+    Circuit.RL.GridWorld
+  build-depends:
+    base >=4.18 && <5,
+    circuits >=0.2 && <0.4,
+
+executable circuits-rl-axioma
+  import: ghc-options-stanza
+  import: ghc2024-stanza
+  hs-source-dirs: app
+  main-is: axioma.hs
+  build-depends:
+    base >=4.18 && <5,
+    circuits,
+    circuits-rl,
