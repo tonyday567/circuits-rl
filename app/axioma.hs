@@ -1,5 +1,6 @@
 module Main where
 
+import Circuit.RL.Estimator
 import Circuit.RL.GridWorld
 import Prelude hiding (id, (.))
 
@@ -71,7 +72,50 @@ main = do
         check "GridWorld System VI matches direct VI" $
           all
             (\s -> approx (valueIterSystem 4 0.9 s) (valueIter 4 0.9 s))
-            [S0, S1, S2, Goal]
+            [S0, S1, S2, Goal],
+        -- -----------------------------------------------------------------------
+        -- W2: REINFORCE == pathwise oracle
+        -- -----------------------------------------------------------------------
+        check "Estimator Dual product rule" $
+          getDual (Dual (2 :: Double, 3) * Dual (5, 7)) == (10, 2 * 7 + 3 * 5),
+        check "REINFORCE == closed form at θ=3, σ=0.5, a_target=1" $
+          reinforceGrad 3.0 0.5 1.0 == closedFormGrad 3.0 0.5 1.0,
+        check "Pathwise == closed form at θ=3, σ=0.5, a_target=1" $
+          pathwiseGrad 3.0 0.5 1.0 == closedFormGrad 3.0 0.5 1.0,
+        check "REINFORCE == pathwise at θ=3, σ=0.5, a_target=1" $
+          reinforceGrad 3.0 0.5 1.0 == pathwiseGrad 3.0 0.5 1.0,
+        check "Closed form exact: ∇J(θ=3, a_target=1) = -4" $
+          closedFormGrad 3.0 0.5 1.0 == -4.0,
+        check "REINFORCE / closed form sweep over θ ∈ [0, 10]" $
+          all
+            ( \theta ->
+                reinforceGrad theta 0.5 1.0 == closedFormGrad theta 0.5 1.0
+            )
+            [0, 0.5, 1, 2, 3, 5, 7, 10],
+        check "Pathwise / closed form sweep over θ ∈ [0, 10]" $
+          all
+            ( \theta ->
+                pathwiseGrad theta 0.5 1.0 == closedFormGrad theta 0.5 1.0
+            )
+            [0, 0.5, 1, 2, 3, 5, 7, 10],
+        check "REINFORCE independent of σ (as it should: both sides use σ)" $
+          all
+            ( \sigma ->
+                reinforceGrad 3.0 sigma 1.0 == closedFormGrad 3.0 sigma 1.0
+            )
+            [0.1, 0.25, 0.5, 1.0, 2.0],
+        check "Pathwise independent of σ" $
+          all
+            ( \sigma ->
+                pathwiseGrad 3.0 sigma 1.0 == closedFormGrad 3.0 sigma 1.0
+            )
+            [0.1, 0.25, 0.5, 1.0, 2.0],
+        check "REINFORCE / pathwise sweep (θ, σ) cross" $
+          all
+            ( \(theta, sigma) ->
+                reinforceGrad theta sigma 1.0 == pathwiseGrad theta sigma 1.0
+            )
+            [(theta, sigma) | theta <- [0, 1, 2, 3], sigma <- [0.1, 0.5, 1.0]]
       ]
   if and results
     then putStrLn "\nAll tests passed."
