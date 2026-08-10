@@ -36,10 +36,23 @@ main = do
         check "GridWorld Prob composition is Bellman backup" $
           let v = valueIter 4 0.9
            in all
-                (\s ->
-                   approx (backupP 0.9 L v s) (bellmanPolicy 0.9 L v s)
-                     && approx (backupP 0.9 R v s) (bellmanPolicy 0.9 R v s))
+                ( \s ->
+                    approx (backupP 0.9 L v s) (bellmanPolicy 0.9 L v s)
+                      && approx (backupP 0.9 R v s) (bellmanPolicy 0.9 R v s)
+                )
                 [S0, S1, S2, Goal],
+        check "Discount oracle: 4-step from S0 exact" $
+          discountedReturn 0.5 R 4 S0 == -0.5
+            && closedFormReturn 0.5 R 4 S0 == -0.5,
+        check "Discount oracle: Prob == closed form, all n≤5, all states" $
+          all
+            (\(n, s) -> discountedReturn 0.5 R n s == closedFormReturn 0.5 R n s)
+            [(n, s) | n <- [1 .. 5], s <- [S0, S1, S2, Goal]],
+        check "Discount oracle: hand values match closed form" $
+          closedFormReturn 0.5 R 1 S0 == -1
+            && closedFormReturn 0.5 R 2 S0 == -1.5
+            && closedFormReturn 0.5 R 3 S0 == -1.75
+            && closedFormReturn 0.5 R 4 S0 == -0.5,
         check "GridWorld tropical shortestPath 0" $
           let Tropical x = shortestPath 0 S0 in isInfinite x,
         check "GridWorld tropical shortestPath hand values" $

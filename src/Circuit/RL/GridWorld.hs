@@ -27,6 +27,10 @@ module Circuit.RL.GridWorld
     bellmanP,
     backupP,
 
+    -- * Discounted-return oracle
+    discountedReturn,
+    closedFormReturn,
+
     -- * System (Prob) view
     expectSystem,
     gridSystem,
@@ -145,6 +149,38 @@ backupP gamma a v s =
   runProb (bellmanP gamma a) (\(_, s') -> v s') ((), s)
 
 -- ---------------------------------------------------------------------------
+-- Discounted-return oracle
+-- ---------------------------------------------------------------------------
+
+-- | N-step discounted return via Prob composition.
+--
+-- Composes 'bellmanP gamma a' @n@ times via the 'Category' instance, then
+-- applies the result to a zero continuation.  By the laws of 'Prob' 'Category'
+-- composition, this is the n-step Bellman backup: reward on each step,
+-- discounted and summed.
+--
+-- >>> discountedReturn 0.5 R 4 S0
+-- -0.5
+discountedReturn :: Double -> Action -> Int -> State -> Double
+discountedReturn gamma a n s =
+  let chainP = foldr (.) id (replicate n (bellmanP gamma a))
+   in runProb chainP (\((), _) -> 0) ((), s)
+
+-- | Closed-form discounted return on a deterministic chain.
+--
+-- /Σ_{t=0}^{n-1}/ /γ/^t · reward(step^t(a, s)).
+-- All terms are exact in 'Double' when /γ/ is a dyadic rational (e.g. 0.5)
+-- and rewards are integers.
+--
+-- >>> closedFormReturn 0.5 R 4 S0
+-- -0.5
+closedFormReturn :: Double -> Action -> Int -> State -> Double
+closedFormReturn gamma a n s =
+  sum $ zipWith (*) (map reward states) (iterate (gamma *) 1)
+  where
+    states = take n $ iterate (step a) s
+
+-- ---------------------------------------------------------------------------
 -- Tropical / shortest-path row
 -- ---------------------------------------------------------------------------
 
@@ -190,7 +226,6 @@ shortestPath :: Int -> State -> Tropical
 shortestPath 0 Goal = Tropical 0
 shortestPath 0 _ = Tropical (1 / 0)
 shortestPath n s = bellmanTropical (shortestPath (n - 1)) s
-
 
 -- ---------------------------------------------------------------------------
 -- System (Prob) view: controlled MDP
@@ -257,7 +292,7 @@ bellmanSystem gamma v s =
             [a]
             v
             s
-          | a <- [L, R]
+        | a <- [L, R]
         ]
 
 -- | Finite-horizon value iteration using the 'System' runner.
