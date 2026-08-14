@@ -34,6 +34,12 @@ module Circuit.RL.GridWorld
     -- * System (Prob) view
     expectSystem,
     gridSystem,
+    mdpSystem,
+    mdpCheck,
+    pomdpSystem,
+    pomdpCheck,
+    Observation (..),
+    observe,
     bellmanSystem,
     valueIterSystem,
 
@@ -44,10 +50,11 @@ module Circuit.RL.GridWorld
 where
 
 import Circuit.Category (id, (.))
-import Circuit.Poly (Mono, System (..), monoDir, monoIn)
+import Circuit.Poly (Mono, Poly (..), System, monoDir, monoIn, runSystem, system)
 import Circuit.Prob (Prob (..), embed, score)
 import Data.List (foldl', maximumBy)
 import Data.Ord (comparing)
+import Data.Void (Void, absurd)
 import Prelude hiding (id, (.))
 
 -- | A one-dimensional chain of four states; 'Goal' is the absorbing target.
@@ -256,7 +263,7 @@ expectSystem ::
   (s -> r) ->
   s ->
   r
-expectSystem states (System sys) is q s0 =
+expectSystem states sys is q s0 =
   foldl' sAdd sZero [q s `sMul` distFinal s | s <- states]
   where
     distFinal = foldl' step initDist is
@@ -265,7 +272,7 @@ expectSystem states (System sys) is q s0 =
       foldl' sAdd sZero [dist s `sMul` pTrans s i s' | s <- states]
     pTrans s i s' =
       runProb
-        sys
+        (runSystem sys)
         (\((), (s'', _)) -> if s' == s'' then sOne else sZero)
         ((), (s, monoIn i))
 
@@ -273,9 +280,69 @@ expectSystem states (System sys) is q s0 =
 --
 -- Input: action ('L' or 'R'). Output: full state observation.
 gridSystem :: System (Prob (->) Double) State (Mono Action State)
-gridSystem = System $ Prob $ \k (x, (s, d)) ->
+gridSystem = system $ Prob $ \k (x, (s, d)) ->
   let s' = step (monoDir d) s
    in k (x, (s', (s', ())))
+
+-- ---------------------------------------------------------------------------
+-- MDP and POMDP polynomial shapes
+-- ---------------------------------------------------------------------------
+
+-- | MDP interface: action in, next-state and reward out.
+--
+-- This matches the instance-table claim that the MDP row uses
+-- @Mono a (s', r)@.  The reward is pinned on the current state to match
+-- 'bellmanSystem' / 'bellmanOpt'.
+mdpSystem :: System (Prob (->) Double) State (Mono Action (State, Double))
+mdpSystem = system $ Prob $ \k (x, (s, d)) ->
+  let a = monoDir d
+      s' = step a s
+   in k (x, (s', ((s', reward s), ())))
+
+-- | Check one deterministic MDP step by continuation.
+mdpCheck :: Action -> State -> State -> Double -> Bool
+mdpCheck a s expectedS' expectedR =
+  runProb (runSystem mdpSystem) checkCont ((), (s, monoIn a)) == 1.0
+  where
+    checkCont (_, (_sNext, ((s'', r), ()))) =
+      if s'' == expectedS' && r == expectedR then 1.0 else 0.0
+
+-- | POMDP observation: coarse location, not the true state.
+data Observation = Far | Near | AtGoal
+  deriving stock (Eq, Show, Enum, Bounded, Ord)
+
+-- | Coarse observation function.
+observe :: State -> Observation
+observe S0 = Far
+observe S1 = Near
+observe S2 = Near
+observe Goal = AtGoal
+
+-- | POMDP interface: hidden state carried as a 'Const' position, external loop
+-- is action in / observation out.
+--
+-- This matches the instance-table claim that the POMDP row uses a state-hiding
+-- @Prod (Const s) (Mono a o)@.  The @Const s@ position exposes the hidden
+-- state as output but supplies no direction, so the external agent cannot feed
+-- it back as input.
+pomdpSystem :: System (Prob (->) Double) State (Prod (Const State) (Mono Action Observation))
+pomdpSystem = system $ Prob $ \k (x, (s, d)) ->
+  case d of
+    Left v -> absurd v
+    Right dMono -> case dMono of
+      Left v -> absurd v
+      Right a ->
+        let s' = step a s
+            o = observe s'
+         in k (x, (s', (s', (o, ()))))
+
+-- | Check one deterministic POMDP step by continuation.
+pomdpCheck :: Action -> State -> State -> Observation -> Bool
+pomdpCheck a s expectedS' expectedO =
+  runProb (runSystem pomdpSystem) checkCont ((), (s, Right (monoIn a))) == 1.0
+  where
+    checkCont (_, (_sNext, (hidden, (obs, ())))) =
+      if hidden == expectedS' && obs == expectedO then 1.0 else 0.0
 
 -- | One-step Bellman optimality backup via 'System (Prob)'.
 --
