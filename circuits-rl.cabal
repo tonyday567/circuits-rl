@@ -49,6 +49,7 @@ library
   exposed-modules:
     Circuit.RL.Estimator
     Circuit.RL.GridWorld
+
   build-depends:
     base >=4.18 && <5,
     circuits >=0.2 && <0.5,
