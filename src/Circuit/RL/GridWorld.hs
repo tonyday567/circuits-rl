@@ -266,9 +266,9 @@ expectSystem ::
 expectSystem states sys is q s0 =
   foldl' sAdd sZero [q s `sMul` distFinal s | s <- states]
   where
-    distFinal = foldl' step initDist is
+    distFinal = foldl' stepDist initDist is
     initDist s = if s == s0 then sOne else sZero
-    step dist i s' =
+    stepDist dist i s' =
       foldl' sAdd sZero [dist s `sMul` pTrans s i s' | s <- states]
     pTrans s i s' =
       runProb

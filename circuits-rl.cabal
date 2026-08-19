@@ -61,5 +61,4 @@ executable circuits-rl-axioma
   main-is: axioma.hs
   build-depends:
     base >=4.18 && <5,
-    circuits,
     circuits-rl,
