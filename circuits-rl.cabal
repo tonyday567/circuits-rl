@@ -51,8 +51,8 @@ library
     Circuit.RL.GridWorld
 
   build-depends:
-    base >=4.18 && <5,
-    circuits >=0.2 && <0.5,
+    base >=4.20 && <5,
+    circuits >=0.3 && <0.4,
 
 executable circuits-rl-axioma
   import: ghc-options-stanza
@@ -60,5 +60,5 @@ executable circuits-rl-axioma
   hs-source-dirs: app
   main-is: axioma.hs
   build-depends:
-    base >=4.18 && <5,
+    base >=4.20 && <5,
     circuits-rl,
