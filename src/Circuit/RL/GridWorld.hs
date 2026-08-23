@@ -50,8 +50,9 @@ module Circuit.RL.GridWorld
 where
 
 import Circuit.Category (id, (.))
-import Circuit.Poly (Mono, Poly (..), System, monoDir, monoIn, runSystem, system)
+import Circuit.Poly (Mono, Poly (..))
 import Circuit.Prob (Prob (..), embed, score)
+import Circuit.System (System, monoDir, monoIn, runSystem, system)
 import Data.List (foldl', maximumBy)
 import Data.Ord (comparing)
 import Data.Void (Void, absurd)
