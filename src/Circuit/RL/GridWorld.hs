@@ -31,7 +31,7 @@ module Circuit.RL.GridWorld
     discountedReturn,
     closedFormReturn,
 
-    -- * System (Prob) view
+    -- * Moore (,) (Prob) view
     expectSystem,
     gridSystem,
     mdpSystem,
@@ -52,7 +52,7 @@ where
 import Circuit.Category (id, (.))
 import Circuit.Poly (Mono, Poly (..))
 import Circuit.Prob (Prob (..), embed, score)
-import Circuit.System (System, monoDir, monoIn, runSystem, system)
+import Circuit.Moore (Moore (..), monoDir, monoIn, mooreMorphism, moore)
 import Data.List (foldl', maximumBy)
 import Data.Ord (comparing)
 import Data.Void (Void, absurd)
@@ -236,7 +236,7 @@ shortestPath 0 _ = Tropical (1 / 0)
 shortestPath n s = bellmanTropical (shortestPath (n - 1)) s
 
 -- ---------------------------------------------------------------------------
--- System (Prob) view: controlled MDP
+-- Moore (,) (Prob) view: controlled MDP
 -- ---------------------------------------------------------------------------
 
 -- | Local semiring class for the expectation runner (mirrors the kepler
@@ -259,7 +259,7 @@ instance Semiring Double where
 expectSystem ::
   (Eq s, Semiring r) =>
   [s] ->
-  System (Prob (->) r) s (Mono i o) ->
+  Moore (,) (Prob (->) r) s (Mono i o) ->
   [i] ->
   (s -> r) ->
   s ->
@@ -273,15 +273,15 @@ expectSystem states sys is q s0 =
       foldl' sAdd sZero [dist s `sMul` pTrans s i s' | s <- states]
     pTrans s i s' =
       runProb
-        (runSystem sys)
+        (mooreMorphism sys)
         (\((), (s'', _)) -> if s' == s'' then sOne else sZero)
         ((), (s, monoIn i))
 
 -- | The gridworld as a controlled stochastic Moore machine.
 --
 -- Input: action ('L' or 'R'). Output: full state observation.
-gridSystem :: System (Prob (->) Double) State (Mono Action State)
-gridSystem = system $ Prob $ \k (x, (s, d)) ->
+gridSystem :: Moore (,) (Prob (->) Double) State (Mono Action State)
+gridSystem = moore $ Prob $ \k (x, (s, d)) ->
   let s' = step (monoDir d) s
    in k (x, (s', (s', ())))
 
@@ -294,8 +294,8 @@ gridSystem = system $ Prob $ \k (x, (s, d)) ->
 -- This matches the instance-table claim that the MDP row uses
 -- @Mono a (s', r)@.  The reward is pinned on the current state to match
 -- 'bellmanSystem' / 'bellmanOpt'.
-mdpSystem :: System (Prob (->) Double) State (Mono Action (State, Double))
-mdpSystem = system $ Prob $ \k (x, (s, d)) ->
+mdpSystem :: Moore (,) (Prob (->) Double) State (Mono Action (State, Double))
+mdpSystem = moore $ Prob $ \k (x, (s, d)) ->
   let a = monoDir d
       s' = step a s
    in k (x, (s', ((s', reward s), ())))
@@ -303,7 +303,7 @@ mdpSystem = system $ Prob $ \k (x, (s, d)) ->
 -- | Check one deterministic MDP step by continuation.
 mdpCheck :: Action -> State -> State -> Double -> Bool
 mdpCheck a s expectedS' expectedR =
-  runProb (runSystem mdpSystem) checkCont ((), (s, monoIn a)) == 1.0
+  runProb (mooreMorphism mdpSystem) checkCont ((), (s, monoIn a)) == 1.0
   where
     checkCont (_, (_sNext, ((s'', r), ()))) =
       if s'' == expectedS' && r == expectedR then 1.0 else 0.0
@@ -326,8 +326,8 @@ observe Goal = AtGoal
 -- @Prod (Const s) (Mono a o)@.  The @Const s@ position exposes the hidden
 -- state as output but supplies no direction, so the external agent cannot feed
 -- it back as input.
-pomdpSystem :: System (Prob (->) Double) State (Prod (Const State) (Mono Action Observation))
-pomdpSystem = system $ Prob $ \k (x, (s, d)) ->
+pomdpSystem :: Moore (,) (Prob (->) Double) State (Prod (Const State) (Mono Action Observation))
+pomdpSystem = moore $ Prob $ \k (x, (s, d)) ->
   case d of
     Left v -> absurd v
     Right dMono -> case dMono of
@@ -340,14 +340,14 @@ pomdpSystem = system $ Prob $ \k (x, (s, d)) ->
 -- | Check one deterministic POMDP step by continuation.
 pomdpCheck :: Action -> State -> State -> Observation -> Bool
 pomdpCheck a s expectedS' expectedO =
-  runProb (runSystem pomdpSystem) checkCont ((), (s, Right (monoIn a))) == 1.0
+  runProb (mooreMorphism pomdpSystem) checkCont ((), (s, Right (monoIn a))) == 1.0
   where
     checkCont (_, (_sNext, (hidden, (obs, ())))) =
       if hidden == expectedS' && obs == expectedO then 1.0 else 0.0
 
--- | One-step Bellman optimality backup via 'System (Prob)'.
+-- | One-step Bellman optimality backup via 'Moore (,) (Prob)'.
 --
--- Reward is pinned on the /current/ state (matching 'bellmanOpt'); the System
+-- Reward is pinned on the /current/ state (matching 'bellmanOpt'); the Moore (,)
 -- runner computes the expected discounted future value of the next state.
 bellmanSystem :: Double -> (State -> Double) -> State -> Double
 bellmanSystem gamma v s =
@@ -363,7 +363,7 @@ bellmanSystem gamma v s =
         | a <- [L, R]
         ]
 
--- | Finite-horizon value iteration using the 'System' runner.
+-- | Finite-horizon value iteration using the 'Moore (,)' runner.
 valueIterSystem :: Int -> Double -> State -> Double
 valueIterSystem 0 _ _ = 0
 valueIterSystem n gamma s = bellmanSystem gamma (valueIterSystem (n - 1) gamma) s

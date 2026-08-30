@@ -62,26 +62,26 @@ main = do
               Tropical d2 = shortestPath 3 S0
               Tropical d3 = shortestPath 3 Goal
            in isInfinite d0 && isInfinite d1 && approx d2 3 && d3 == 0,
-        check "GridWorld System (Prob) typechecks" $
+        check "GridWorld Moore (,) (Prob) typechecks" $
           length [valueIterSystem 0 0.9 S0, valueIterSystem 0 0.9 Goal] == 2,
-        check "GridWorld System backup matches direct VI" $
+        check "GridWorld Moore (,) backup matches direct VI" $
           let v = valueIter 4 0.9
            in all
                 (\s -> approx (bellmanSystem 0.9 v s) (bellmanOpt 0.9 v s))
                 [S0, S1, S2, Goal],
-        check "GridWorld System VI matches direct VI" $
+        check "GridWorld Moore (,) VI matches direct VI" $
           all
             (\s -> approx (valueIterSystem 4 0.9 s) (valueIter 4 0.9 s))
             [S0, S1, S2, Goal],
         -- -----------------------------------------------------------------------
         -- W3: MDP / POMDP polynomial shape oracles
         -- -----------------------------------------------------------------------
-        check "MDP System uses Mono Action (State, Double)" $
+        check "MDP Moore (,) uses Mono Action (State, Double)" $
           mdpCheck R S0 S1 (-1.0)
             && mdpCheck R S1 S2 (-1.0)
             && mdpCheck R S2 Goal (-1.0)
             && mdpCheck L S1 S0 (-1.0),
-        check "POMDP System uses Prod (Const State) (Mono Action Observation)" $
+        check "POMDP Moore (,) uses Prod (Const State) (Mono Action Observation)" $
           pomdpCheck R S0 S1 Near
             && pomdpCheck R S1 S2 Near
             && pomdpCheck R S2 Goal AtGoal
