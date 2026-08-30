@@ -259,7 +259,7 @@ instance Semiring Double where
 expectSystem ::
   (Eq s, Semiring r) =>
   [s] ->
-  Moore (,) (Prob (->) r) s (Mono i o) ->
+  Moore (,) s (Prob (->) r) (Mono i o) ->
   [i] ->
   (s -> r) ->
   s ->
@@ -280,7 +280,7 @@ expectSystem states sys is q s0 =
 -- | The gridworld as a controlled stochastic Moore machine.
 --
 -- Input: action ('L' or 'R'). Output: full state observation.
-gridSystem :: Moore (,) (Prob (->) Double) State (Mono Action State)
+gridSystem :: Moore (,) State (Prob (->) Double) (Mono Action State)
 gridSystem = moore $ Prob $ \k (x, (s, d)) ->
   let s' = step (monoDir d) s
    in k (x, (s', (s', ())))
@@ -294,7 +294,7 @@ gridSystem = moore $ Prob $ \k (x, (s, d)) ->
 -- This matches the instance-table claim that the MDP row uses
 -- @Mono a (s', r)@.  The reward is pinned on the current state to match
 -- 'bellmanSystem' / 'bellmanOpt'.
-mdpSystem :: Moore (,) (Prob (->) Double) State (Mono Action (State, Double))
+mdpSystem :: Moore (,) State (Prob (->) Double) (Mono Action (State, Double))
 mdpSystem = moore $ Prob $ \k (x, (s, d)) ->
   let a = monoDir d
       s' = step a s
@@ -326,7 +326,7 @@ observe Goal = AtGoal
 -- @Prod (Const s) (Mono a o)@.  The @Const s@ position exposes the hidden
 -- state as output but supplies no direction, so the external agent cannot feed
 -- it back as input.
-pomdpSystem :: Moore (,) (Prob (->) Double) State (Prod (Const State) (Mono Action Observation))
+pomdpSystem :: Moore (,) State (Prob (->) Double) (Prod (Const State) (Mono Action Observation))
 pomdpSystem = moore $ Prob $ \k (x, (s, d)) ->
   case d of
     Left v -> absurd v
