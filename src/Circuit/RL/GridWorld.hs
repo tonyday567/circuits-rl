@@ -50,9 +50,9 @@ module Circuit.RL.GridWorld
 where
 
 import Circuit.Category (id, (.))
+import Circuit.Moore (Moore (..), monoDir, monoIn, moore, mooreMorphism)
 import Circuit.Poly (Mono, Poly (..))
 import Circuit.Prob (Prob (..), embed, score)
-import Circuit.Moore (Moore (..), monoDir, monoIn, mooreMorphism, moore)
 import Data.List (foldl', maximumBy)
 import Data.Ord (comparing)
 import Data.Void (Void, absurd)
