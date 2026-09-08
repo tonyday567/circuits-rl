@@ -31,7 +31,7 @@ module Circuit.RL.GridWorld
     discountedReturn,
     closedFormReturn,
 
-    -- * Machine (,) (Prob) view
+    -- * Fused (,) (Prob) view
     expectSystem,
     gridSystem,
     mdpSystem,
@@ -50,8 +50,8 @@ module Circuit.RL.GridWorld
 where
 
 import Circuit.Category (id, (.))
-import Circuit.Machine (Machine, machine, machineMorphism, monoDir, monoIn)
-import Circuit.Poly (Mono, Poly (..))
+import Circuit.Cell (Body (..), MonoBody)
+import Circuit.Poly (Dir, Mono, Poly (..), Pos, monoDir, monoIn)
 import Circuit.Prob (Prob (..), embed, score)
 import Data.List (foldl', maximumBy)
 import Data.Ord (comparing)
@@ -236,7 +236,7 @@ shortestPath 0 _ = Tropical (1 / 0)
 shortestPath n s = bellmanTropical (shortestPath (n - 1)) s
 
 -- ---------------------------------------------------------------------------
--- Machine (,) (Prob) view: controlled MDP
+-- Fused (,) (Prob) view: controlled MDP
 -- ---------------------------------------------------------------------------
 
 -- | Local semiring class for the expectation runner (mirrors the kepler
@@ -253,13 +253,13 @@ instance Semiring Double where
   sZero = 0
   sOne = 1
 
--- | Step a finite-state stochastic Machine machine by expectation, exactly as in
+-- | Step a finite-state stochastic system by expectation, exactly as in
 -- the circuits keystone, but specialised to 'Mono i o' with full state
 -- observation.
 expectSystem ::
   (Eq s, Semiring r) =>
   [s] ->
-  Machine (,) s (Prob (->) r) (Mono i o) ->
+  MonoBody (,) s (Prob (->) r) i o ->
   [i] ->
   (s -> r) ->
   s ->
@@ -273,15 +273,15 @@ expectSystem states sys is q s0 =
       foldl' sAdd sZero [dist s `sMul` pTrans s i s' | s <- states]
     pTrans s i s' =
       runProb
-        (machineMorphism sys)
+        (morphism sys)
         (\((), (s'', _)) -> if s' == s'' then sOne else sZero)
         ((), (s, monoIn i))
 
--- | The gridworld as a controlled stochastic Machine machine.
+-- | The gridworld as a controlled stochastic system.
 --
 -- Input: action ('L' or 'R'). Output: full state observation.
-gridSystem :: Machine (,) State (Prob (->) Double) (Mono Action State)
-gridSystem = machine $ Prob $ \k (x, (s, d)) ->
+gridSystem :: MonoBody (,) State (Prob (->) Double) Action State
+gridSystem = Body $ Prob $ \k (x, (s, d)) ->
   let s' = step (monoDir d) s
    in k (x, (s', (s', ())))
 
@@ -294,8 +294,8 @@ gridSystem = machine $ Prob $ \k (x, (s, d)) ->
 -- This matches the instance-table claim that the MDP row uses
 -- @Mono a (s', r)@.  The reward is pinned on the current state to match
 -- 'bellmanSystem' / 'bellmanOpt'.
-mdpSystem :: Machine (,) State (Prob (->) Double) (Mono Action (State, Double))
-mdpSystem = machine $ Prob $ \k (x, (s, d)) ->
+mdpSystem :: MonoBody (,) State (Prob (->) Double) Action (State, Double)
+mdpSystem = Body $ Prob $ \k (x, (s, d)) ->
   let a = monoDir d
       s' = step a s
    in k (x, (s', ((s', reward s), ())))
@@ -303,7 +303,7 @@ mdpSystem = machine $ Prob $ \k (x, (s, d)) ->
 -- | Check one deterministic MDP step by continuation.
 mdpCheck :: Action -> State -> State -> Double -> Bool
 mdpCheck a s expectedS' expectedR =
-  runProb (machineMorphism mdpSystem) checkCont ((), (s, monoIn a)) == 1.0
+  runProb (morphism mdpSystem) checkCont ((), (s, monoIn a)) == 1.0
   where
     checkCont (_, (_sNext, ((s'', r), ()))) =
       if s'' == expectedS' && r == expectedR then 1.0 else 0.0
@@ -326,8 +326,14 @@ observe Goal = AtGoal
 -- @Prod (Const s) (Mono a o)@.  The @Const s@ position exposes the hidden
 -- state as output but supplies no direction, so the external agent cannot feed
 -- it back as input.
-pomdpSystem :: Machine (,) State (Prob (->) Double) (Prod (Const State) (Mono Action Observation))
-pomdpSystem = machine $ Prob $ \k (x, (s, d)) ->
+pomdpSystem ::
+  Body
+    (,)
+    State
+    (Prob (->) Double)
+    (Dir (Prod (Const State) (Mono Action Observation)))
+    (Pos (Prod (Const State) (Mono Action Observation)))
+pomdpSystem = Body $ Prob $ \k (x, (s, d)) ->
   case d of
     Left v -> absurd v
     Right dMono -> case dMono of
@@ -340,14 +346,14 @@ pomdpSystem = machine $ Prob $ \k (x, (s, d)) ->
 -- | Check one deterministic POMDP step by continuation.
 pomdpCheck :: Action -> State -> State -> Observation -> Bool
 pomdpCheck a s expectedS' expectedO =
-  runProb (machineMorphism pomdpSystem) checkCont ((), (s, Right (monoIn a))) == 1.0
+  runProb (morphism pomdpSystem) checkCont ((), (s, Right (monoIn a))) == 1.0
   where
     checkCont (_, (_sNext, (hidden, (obs, ())))) =
       if hidden == expectedS' && obs == expectedO then 1.0 else 0.0
 
--- | One-step Bellman optimality backup via 'Machine (,) (Prob)'.
+-- | One-step Bellman optimality backup via 'MonoBody (,) (Prob)'.
 --
--- Reward is pinned on the /current/ state (matching 'bellmanOpt'); the Machine (,)
+-- Reward is pinned on the /current/ state (matching 'bellmanOpt'); the fused (,)
 -- runner computes the expected discounted future value of the next state.
 bellmanSystem :: Double -> (State -> Double) -> State -> Double
 bellmanSystem gamma v s =
@@ -363,7 +369,7 @@ bellmanSystem gamma v s =
         | a <- [L, R]
         ]
 
--- | Finite-horizon value iteration using the 'Machine (,)' runner.
+-- | Finite-horizon value iteration using the fused '(,)' runner.
 valueIterSystem :: Int -> Double -> State -> Double
 valueIterSystem 0 _ _ = 0
 valueIterSystem n gamma s = bellmanSystem gamma (valueIterSystem (n - 1) gamma) s
