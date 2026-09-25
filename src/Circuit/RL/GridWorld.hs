@@ -50,7 +50,7 @@ module Circuit.RL.GridWorld
 where
 
 import Circuit.Category (id, (.))
-import Circuit.Cell (Body (..), MonoBody)
+import Circuit.GMachine (MonoBody, Stratum (..))
 import Circuit.Poly (Dir, Mono, Poly (..), Pos, monoDir, monoIn)
 import Circuit.Prob (Prob (..), embed, score)
 import Data.List (foldl', maximumBy)
@@ -281,7 +281,7 @@ expectSystem states sys is q s0 =
 --
 -- Input: action ('L' or 'R'). Output: full state observation.
 gridSystem :: MonoBody (,) State (Prob (->) Double) Action State
-gridSystem = Body $ Prob $ \k (x, (s, d)) ->
+gridSystem = Stratum $ Prob $ \k (x, (s, d)) ->
   let s' = step (monoDir d) s
    in k (x, (s', (s', ())))
 
@@ -295,7 +295,7 @@ gridSystem = Body $ Prob $ \k (x, (s, d)) ->
 -- @Mono a (s', r)@.  The reward is pinned on the current state to match
 -- 'bellmanSystem' / 'bellmanOpt'.
 mdpSystem :: MonoBody (,) State (Prob (->) Double) Action (State, Double)
-mdpSystem = Body $ Prob $ \k (x, (s, d)) ->
+mdpSystem = Stratum $ Prob $ \k (x, (s, d)) ->
   let a = monoDir d
       s' = step a s
    in k (x, (s', ((s', reward s), ())))
@@ -327,13 +327,13 @@ observe Goal = AtGoal
 -- state as output but supplies no direction, so the external agent cannot feed
 -- it back as input.
 pomdpSystem ::
-  Body
+  Stratum
     (,)
     State
     (Prob (->) Double)
     (Dir (Prod (Const State) (Mono Action Observation)))
     (Pos (Prod (Const State) (Mono Action Observation)))
-pomdpSystem = Body $ Prob $ \k (x, (s, d)) ->
+pomdpSystem = Stratum $ Prob $ \k (x, (s, d)) ->
   case d of
     Left v -> absurd v
     Right dMono -> case dMono of
