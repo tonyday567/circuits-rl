@@ -81,7 +81,7 @@ main = do
             && mdpCheck R S1 S2 (-1.0)
             && mdpCheck R S2 Goal (-1.0)
             && mdpCheck L S1 S0 (-1.0),
-        check "POMDP Moore (,) uses Prod (Const State) (Mono Action Observation)" $
+        check "POMDP Moore (,) uses Prod (Konst State) (Mono Action Observation)" $
           pomdpCheck R S0 S1 Near
             && pomdpCheck R S1 S2 Near
             && pomdpCheck R S2 Goal AtGoal

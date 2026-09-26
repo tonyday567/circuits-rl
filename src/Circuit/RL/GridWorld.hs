@@ -319,11 +319,11 @@ observe S1 = Near
 observe S2 = Near
 observe Goal = AtGoal
 
--- | POMDP interface: hidden state carried as a 'Const' position, external loop
+-- | POMDP interface: hidden state carried as a 'Konst' position, external loop
 -- is action in / observation out.
 --
 -- This matches the instance-table claim that the POMDP row uses a state-hiding
--- @Prod (Const s) (Mono a o)@.  The @Const s@ position exposes the hidden
+-- @Prod (Konst s) (Mono a o)@.  The @Konst s@ position exposes the hidden
 -- state as output but supplies no direction, so the external agent cannot feed
 -- it back as input.
 pomdpSystem ::
@@ -331,8 +331,8 @@ pomdpSystem ::
     (,)
     State
     (Prob (->) Double)
-    (Dir (Prod (Const State) (Mono Action Observation)))
-    (Pos (Prod (Const State) (Mono Action Observation)))
+    (Dir (Prod (Konst State) (Mono Action Observation)))
+    (Pos (Prod (Konst State) (Mono Action Observation)))
 pomdpSystem = Stratum $ Prob $ \k (x, (s, d)) ->
   case d of
     Left v -> absurd v
