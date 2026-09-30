@@ -50,7 +50,7 @@ module Circuit.RL.GridWorld
 where
 
 import Circuit.Category (id, (.))
-import Circuit.GMachine (MonoBody, Stratum (..))
+import Circuit.GMachine (Stratum (..))
 import Circuit.Poly (Dir, Mono, Poly (..), Pos, monoDir, monoIn)
 import Circuit.Prob (Prob (..), embed, score)
 import Data.List (foldl', maximumBy)
@@ -259,7 +259,7 @@ instance Semiring Double where
 expectSystem ::
   (Eq s, Semiring r) =>
   [s] ->
-  MonoBody (,) s (Prob (->) r) i o ->
+  Stratum (,) s (Prob (->) r) (Either Void i) (o, ()) ->
   [i] ->
   (s -> r) ->
   s ->
@@ -280,7 +280,7 @@ expectSystem states sys is q s0 =
 -- | The gridworld as a controlled stochastic system.
 --
 -- Input: action ('L' or 'R'). Output: full state observation.
-gridSystem :: MonoBody (,) State (Prob (->) Double) Action State
+gridSystem :: Stratum (,) State (Prob (->) Double) (Either Void Action) (State, ())
 gridSystem = Stratum $ Prob $ \k (x, (s, d)) ->
   let s' = step (monoDir d) s
    in k (x, (s', (s', ())))
@@ -294,7 +294,7 @@ gridSystem = Stratum $ Prob $ \k (x, (s, d)) ->
 -- This matches the instance-table claim that the MDP row uses
 -- @Mono a (s', r)@.  The reward is pinned on the current state to match
 -- 'bellmanSystem' / 'bellmanOpt'.
-mdpSystem :: MonoBody (,) State (Prob (->) Double) Action (State, Double)
+mdpSystem :: Stratum (,) State (Prob (->) Double) (Either Void Action) ((State, Double), ())
 mdpSystem = Stratum $ Prob $ \k (x, (s, d)) ->
   let a = monoDir d
       s' = step a s
@@ -351,7 +351,7 @@ pomdpCheck a s expectedS' expectedO =
     checkCont (_, (_sNext, (hidden, (obs, ())))) =
       if hidden == expectedS' && obs == expectedO then 1.0 else 0.0
 
--- | One-step Bellman optimality backup via 'MonoBody (,) (Prob)'.
+-- | One-step Bellman optimality backup via 'Stratum (,) (Prob)'.
 --
 -- Reward is pinned on the /current/ state (matching 'bellmanOpt'); the fused (,)
 -- runner computes the expected discounted future value of the next state.
