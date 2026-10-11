@@ -50,7 +50,7 @@ module Circuit.RL.GridWorld
 where
 
 import Circuit.Category (id, (.))
-import Circuit.GMachine (Stratum (..))
+import Circuit.Machine (Step (..))
 import Circuit.Poly (Dir, Mono, Poly (..), Pos, monoDir, monoIn)
 import Circuit.Prob (Prob (..), embed, score)
 import Data.List (foldl', maximumBy)
@@ -259,7 +259,7 @@ instance Semiring Double where
 expectSystem ::
   (Eq s, Semiring r) =>
   [s] ->
-  Stratum (,) s (Prob (->) r) (Either Void i) (o, ()) ->
+  Step (,) (,) s s (Prob (->) r) (Either Void i) (o, ()) ->
   [i] ->
   (s -> r) ->
   s ->
@@ -273,15 +273,15 @@ expectSystem states sys is q s0 =
       foldl' sAdd sZero [dist s `sMul` pTrans s i s' | s <- states]
     pTrans s i s' =
       runProb
-        (morphism sys)
+        (run sys)
         (\((), (s'', _)) -> if s' == s'' then sOne else sZero)
         ((), (s, monoIn i))
 
 -- | The gridworld as a controlled stochastic system.
 --
 -- Input: action ('L' or 'R'). Output: full state observation.
-gridSystem :: Stratum (,) State (Prob (->) Double) (Either Void Action) (State, ())
-gridSystem = Stratum $ Prob $ \k (x, (s, d)) ->
+gridSystem :: Step (,) (,) State State (Prob (->) Double) (Either Void Action) (State, ())
+gridSystem = Step $ Prob $ \k (x, (s, d)) ->
   let s' = step (monoDir d) s
    in k (x, (s', (s', ())))
 
@@ -294,8 +294,8 @@ gridSystem = Stratum $ Prob $ \k (x, (s, d)) ->
 -- This matches the instance-table claim that the MDP row uses
 -- @Mono a (s', r)@.  The reward is pinned on the current state to match
 -- 'bellmanSystem' / 'bellmanOpt'.
-mdpSystem :: Stratum (,) State (Prob (->) Double) (Either Void Action) ((State, Double), ())
-mdpSystem = Stratum $ Prob $ \k (x, (s, d)) ->
+mdpSystem :: Step (,) (,) State State (Prob (->) Double) (Either Void Action) ((State, Double), ())
+mdpSystem = Step $ Prob $ \k (x, (s, d)) ->
   let a = monoDir d
       s' = step a s
    in k (x, (s', ((s', reward s), ())))
@@ -303,7 +303,7 @@ mdpSystem = Stratum $ Prob $ \k (x, (s, d)) ->
 -- | Check one deterministic MDP step by continuation.
 mdpCheck :: Action -> State -> State -> Double -> Bool
 mdpCheck a s expectedS' expectedR =
-  runProb (morphism mdpSystem) checkCont ((), (s, monoIn a)) == 1.0
+  runProb (run mdpSystem) checkCont ((), (s, monoIn a)) == 1.0
   where
     checkCont (_, (_sNext, ((s'', r), ()))) =
       if s'' == expectedS' && r == expectedR then 1.0 else 0.0
@@ -327,13 +327,15 @@ observe Goal = AtGoal
 -- state as output but supplies no direction, so the external agent cannot feed
 -- it back as input.
 pomdpSystem ::
-  Stratum
+  Step
     (,)
+    (,)
+    State
     State
     (Prob (->) Double)
     (Dir (Prod (Konst State) (Mono Action Observation)))
     (Pos (Prod (Konst State) (Mono Action Observation)))
-pomdpSystem = Stratum $ Prob $ \k (x, (s, d)) ->
+pomdpSystem = Step $ Prob $ \k (x, (s, d)) ->
   case d of
     Left v -> absurd v
     Right dMono -> case dMono of
@@ -346,12 +348,12 @@ pomdpSystem = Stratum $ Prob $ \k (x, (s, d)) ->
 -- | Check one deterministic POMDP step by continuation.
 pomdpCheck :: Action -> State -> State -> Observation -> Bool
 pomdpCheck a s expectedS' expectedO =
-  runProb (morphism pomdpSystem) checkCont ((), (s, Right (monoIn a))) == 1.0
+  runProb (run pomdpSystem) checkCont ((), (s, Right (monoIn a))) == 1.0
   where
     checkCont (_, (_sNext, (hidden, (obs, ())))) =
       if hidden == expectedS' && obs == expectedO then 1.0 else 0.0
 
--- | One-step Bellman optimality backup via 'Stratum (,) (Prob)'.
+-- | One-step Bellman optimality backup via 'Step (,) (,) (Prob)'.
 --
 -- Reward is pinned on the /current/ state (matching 'bellmanOpt'); the fused (,)
 -- runner computes the expected discounted future value of the next state.
