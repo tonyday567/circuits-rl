@@ -50,7 +50,7 @@ module Circuit.RL.GridWorld
 where
 
 import Circuit.Category (id, (.))
-import Circuit.Machine (Step (..))
+import Circuit.Machine (Step (Step))
 import Circuit.Poly (Dir, Mono, Poly (..), Pos, monoDir, monoIn)
 import Circuit.Prob (Prob (..), embed, score)
 import Data.List (foldl', maximumBy)
@@ -267,13 +267,14 @@ expectSystem ::
 expectSystem states sys is q s0 =
   foldl' sAdd sZero [q s `sMul` distFinal s | s <- states]
   where
+    Step sysStep = sys
     distFinal = foldl' stepDist initDist is
     initDist s = if s == s0 then sOne else sZero
     stepDist dist i s' =
       foldl' sAdd sZero [dist s `sMul` pTrans s i s' | s <- states]
     pTrans s i s' =
       runProb
-        (run sys)
+        sysStep
         (\((), (s'', _)) -> if s' == s'' then sOne else sZero)
         ((), (s, monoIn i))
 
@@ -303,8 +304,9 @@ mdpSystem = Step $ Prob $ \k (x, (s, d)) ->
 -- | Check one deterministic MDP step by continuation.
 mdpCheck :: Action -> State -> State -> Double -> Bool
 mdpCheck a s expectedS' expectedR =
-  runProb (run mdpSystem) checkCont ((), (s, monoIn a)) == 1.0
+  runProb mdpStep checkCont ((), (s, monoIn a)) == 1.0
   where
+    Step mdpStep = mdpSystem
     checkCont (_, (_sNext, ((s'', r), ()))) =
       if s'' == expectedS' && r == expectedR then 1.0 else 0.0
 
@@ -348,8 +350,9 @@ pomdpSystem = Step $ Prob $ \k (x, (s, d)) ->
 -- | Check one deterministic POMDP step by continuation.
 pomdpCheck :: Action -> State -> State -> Observation -> Bool
 pomdpCheck a s expectedS' expectedO =
-  runProb (run pomdpSystem) checkCont ((), (s, Right (monoIn a))) == 1.0
+  runProb pomdpStep checkCont ((), (s, Right (monoIn a))) == 1.0
   where
+    Step pomdpStep = pomdpSystem
     checkCont (_, (_sNext, (hidden, (obs, ())))) =
       if hidden == expectedS' && obs == expectedO then 1.0 else 0.0
 
