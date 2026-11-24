@@ -50,7 +50,7 @@ module Circuit.RL.GridWorld
 where
 
 import Circuit.Category (id, (.))
-import Circuit.Machine (Step (Step))
+import Circuit.Step (Step (Step))
 import Circuit.Poly (Dir, Mono, Poly (..), Pos, monoDir, monoIn)
 import Circuit.Prob (Prob (..), embed, score)
 import Data.List (foldl', maximumBy)
